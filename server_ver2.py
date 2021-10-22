@@ -9,6 +9,8 @@ import numpy as np
 import logging
 import pickle
 
+from numpy.core.fromnumeric import std
+
 def CreateLogger(name, fmt="[%(asctime)s]%(name)s<%(levelname)s>%(message)s",
               terminator='\n', level = logging.INFO):
     logger = logging.getLogger(name)
@@ -107,23 +109,20 @@ def process_uplink(c, addr, tx_start, object_size, object_interval, object_numbe
         recv_size = recv_size*(number_of_objects-1)/number_of_objects
         start_index = 1
     info(rlogger,'\n')
-    info(logger,'====================')
-    info(logger,'Total received size: ', round(recv_size/(1024*1024),2), 'Mbytes ', ' first upload time: ', object_latency_list[0], 'ms  mean throughput: ', round((recv_size*8)/((np.sum(object_latency_list[start_index:])*1e3)),2), 'Mbps')
-    info(logger,'Upload time mean: ', round(np.mean(object_latency_list[start_index:]),2) ,'ms, std: ', round(np.std(object_latency_list[start_index:]),2),
-                ' Mean initial latency: ', round(np.mean(object_latency_list[start_index:]) - np.mean(first_to_last_list[start_index:]),2), 'ms')
     info(logger,'Disconnected', addr, '\n')
     
     c.close()
     #stop_tcpdump()
+    object_size_arr = np.ones(len(object_latency_list[:]))*((int)(object_size))*8*1024
+    throughput_arr = object_size_arr/(np.array(object_latency_list[:])*1e3)
     
-    throughput_arr = round((object_size*8*1024)/(object_latency_list[start_index:]*1e3),2)
-    init_latency_arr = round(object_latency_list[start_index:] - first_to_last_list[start_index:],2)
+    init_latency_arr = np.array(object_latency_list[:]) - np.array(first_to_last_list[:])
     
-    mean_throughput = np.mean(throughput_arr)
-    std_throughput = np.std(throughput_arr)
+    mean_throughput = np.mean(throughput_arr[start_index:])
+    std_throughput = np.std(throughput_arr[start_index:])
     
-    mean_init_latency = np.mean(init_latency_arr)
-    std_init_latency = np.mean(init_latency_arr)
+    mean_init_latency = np.mean(init_latency_arr[start_index:])
+    std_init_latency = np.std(init_latency_arr[start_index:])
     
     ## save the log
     key = str(object_size)+'_'+str(object_interval)
@@ -137,14 +136,21 @@ def process_uplink(c, addr, tx_start, object_size, object_interval, object_numbe
     except:
         loaded_uplink = {}
         
+    loaded_uplink[key] = val 
+    '''
     if key in loaded_uplink:
             loaded_uplink[key].append(val)
     else:
         loaded_uplink[key] = []
         loaded_uplink[key].append(val)
-    
+    '''
     with open('uplink_data/uplink.pickle', 'wb') as fw:
         pickle.dump(loaded_uplink, fw)
+    
+    info(logger,'====================')
+    info(logger,'Total received size: ', round(recv_size/(1024*1024),2), 'Mbytes ', ' first throughput: ', throughput_arr[0], 'ms  mean throughput: ', round((recv_size*8)/((np.sum(object_latency_list[start_index:])*1e3)),2), 'Mbps')
+    info(logger, 'First throughput: ', throughput_arr[0], 'Mbps First init latency: ', init_latency_arr[0], 'ms')
+    info(logger, 'Mean/std throughput:', mean_throughput,' ',  std_throughput, 'Mbps Mean/std initial latency: ', mean_init_latency, ' ',std_init_latency)
 
 def process_downlink(c, addr, object_size, object_interval, object_number):
     send_size = 0    
@@ -187,14 +193,14 @@ def process_downlink(c, addr, object_size, object_interval, object_number):
     data_str = data.decode('ascii').strip('(').strip('$').strip('\x00')
     data_str_list = data_str.split('_')
     
-    first_tx_time = data_str_list[2] 
-    mean_tx_time = data_str_list[3]
-    std_tx_time = data_str_list[4]
-    first_init_time = data_str_list[5] 
-    mean_init_time = data_str_list[6]
-    std_init_time = data_str_list[7]
-    mean_throughput = data_str_list[8]
-    std_throughput = data_str_list[9]
+    first_tx_time = round((float)(data_str_list[2]),2) 
+    mean_tx_time = round((float)(data_str_list[3]),2) 
+    std_tx_time = round((float)(data_str_list[4]),2) 
+    first_init_time = round((float)(data_str_list[5]),2) 
+    mean_init_time = round((float)(data_str_list[6]),2) 
+    std_init_time = round((float)(data_str_list[7]),2) 
+    mean_throughput = round((float)(data_str_list[8]),2) 
+    std_throughput = round((float)(data_str_list[9]),2) 
 
     key = str(object_size)+'_'+str(object_interval)
     val = {'object num': max(object_number-1, 1), 'first tx time': first_tx_time, 'first init time': first_init_time ,'mean throughput': mean_throughput, 
@@ -212,8 +218,10 @@ def process_downlink(c, addr, object_size, object_interval, object_number):
     with open('downlink_data/downlink.pickle', 'wb') as fw:
         pickle.dump(loaded_downlink, fw)
 
-    print('Total send size: ', send_size, 'bytes')
-    print('Disconnected', addr)
+    info(logger,'Total send size: ', send_size, 'bytes',  ' first download time: ', first_tx_time, 'ms  mean throughput: ', mean_throughput, 'Mbps')
+    info(logger,'Download time mean: ', mean_tx_time ,'ms, std: ', std_tx_time,
+                ' Mean initial latency: ', mean_init_time, 'ms')
+    info(logger,'Disconnected', addr)
     #stop_tcpdump()       
 
     
