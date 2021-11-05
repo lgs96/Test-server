@@ -48,7 +48,7 @@ def start_tcpdump(sname, iname, hname, port):
 def stop_tcpdump():
     os.system("kill -9 `ps -aux | grep tcpdump | awk '{print $2}'`")
     
-def process_uplink(c, addr, tx_start, object_size, object_interval, object_number):
+def process_uplink(c, addr, save_name, tx_start, object_size, object_interval, object_number):
     
     recv_size = 0
     start = time.time()
@@ -71,7 +71,6 @@ def process_uplink(c, addr, tx_start, object_size, object_interval, object_numbe
         #print('uplink data: ', ('done' in str(data[0:4])))
         recv_size = recv_size + len(data)
         info(rlogger,'process_uplink ', (recv_size),' uploaded objects: ',  number_of_objects)
-        #print('data: ',data)
         
         if ('o_last' in str(data)):
             # Notify completion
@@ -89,7 +88,6 @@ def process_uplink(c, addr, tx_start, object_size, object_interval, object_numbe
             
             debug(logger, 'Object is uploaded, time difference between first to last byte is %dms and upload completion time is %dms',first_to_last,upload_time)
             #print(object_first, object_last)
-                
                 
         if ('o_first' in str(data)):
             idx = str(data).index('o_first')
@@ -131,7 +129,7 @@ def process_uplink(c, addr, tx_start, object_size, object_interval, object_numbe
             'std upload time': round(np.std(object_latency_list[start_index:]),2), 'mean initial latency': mean_init_latency, 'std initial latency': std_init_latency}
     
     try:
-        with open('uplink_data/uplink.pickle', 'rb') as fr:
+        with open('uplink_data/uplink_'+save_name+'.pickle', 'rb') as fr:
             loaded_uplink = pickle.load(fr)
     except:
         loaded_uplink = {}
@@ -144,7 +142,7 @@ def process_uplink(c, addr, tx_start, object_size, object_interval, object_numbe
         loaded_uplink[key] = []
         loaded_uplink[key].append(val)
     '''
-    with open('uplink_data/uplink.pickle', 'wb') as fw:
+    with open('uplink_data/uplink_'+save_name+'.pickle', 'wb') as fw:
         pickle.dump(loaded_uplink, fw)
     
     info(logger,'====================')
@@ -152,7 +150,7 @@ def process_uplink(c, addr, tx_start, object_size, object_interval, object_numbe
     info(logger, 'First throughput: ', throughput_arr[0], 'Mbps First init latency: ', init_latency_arr[0], 'ms')
     info(logger, 'Mean/std throughput:', mean_throughput,' ',  std_throughput, 'Mbps Mean/std initial latency: ', mean_init_latency, ' ',std_init_latency)
 
-def process_downlink(c, addr, object_size, object_interval, object_number):
+def process_downlink(c, addr, save_name, object_size, object_interval, object_number):
     send_size = 0    
     start = time.time()
         
@@ -161,8 +159,8 @@ def process_downlink(c, addr, object_size, object_interval, object_number):
         c.send(bytes(first_bytes_msg, encoding = "ascii"))
         for j in range(object_size):
             try:
-                c.send(bytes(1024))
-                send_size = send_size + 1024
+                c.send(bytes(8192))
+                send_size = send_size + 8192
                 debug(rlogger,'tx_downlink ', (send_size),' transmitted objects: ',  i)
             except:
                 logging.error(logger, "Exception while downlink transmission")
@@ -208,14 +206,14 @@ def process_downlink(c, addr, object_size, object_interval, object_number):
             'std upload time': std_tx_time, 'mean initial latency': mean_init_time, 'std initial latency': std_init_time}
     
     try:
-        with open('downlink_data/downlink.pickle', 'rb') as fr:
+        with open('downlink_data/downlink'+save_name+'.pickle', 'rb') as fr:
             loaded_downlink = pickle.load(fr)
     except:
         loaded_downlink = {}
         
     loaded_downlink[key] = val
     
-    with open('downlink_data/downlink.pickle', 'wb') as fw:
+    with open('downlink_data/downlink'+save_name+'.pickle', 'wb') as fw:
         pickle.dump(loaded_downlink, fw)
 
     info(logger,'Total send size: ', send_size, 'bytes',  ' first download time: ', first_tx_time, 'ms  mean throughput: ', mean_throughput, 'Mbps')
@@ -256,21 +254,23 @@ if __name__ == '__main__':
            logger.info('Uplink')
            data_str = data.decode('ascii').strip('(').strip('$').strip('\x00')
            data_str_list = data_str.split('_')
-           tx_start = (int)(data_str_list[2])
-           object_size = (data_str_list[3])
-           object_interval = (data_str_list[4])
-           object_number =((re.sub(r'[^0-9]', '', data_str_list[5])))
+           save_name = (data_str_list[2])
+           tx_start = (int)(data_str_list[3])
+           object_size = (data_str_list[4])
+           object_interval = (data_str_list[5])
+           object_number =((re.sub(r'[^0-9]', '', data_str_list[6])))
            info(logger, 'Object size: ', object_size, ' Object interval: ', object_interval, ' Object number: ', object_number)
-           t = threading.Thread(target=process_uplink, args=(c, addr, tx_start, object_size, object_interval, object_number))
+           t = threading.Thread(target=process_uplink, args=(c, addr, save_name, tx_start, object_size, object_interval, object_number))
            t.start()
         elif 'd_start' in str(data):
            logger.info('Downlink')
            data_str = data.decode('ascii').strip('(').strip('$').strip('\x00')
            data_str_list = data_str.split('_')
-           object_size = (int)(data_str_list[2])
-           object_interval = (int)(data_str_list[3])
-           object_number = (int)((re.sub(r'[^0-9]', '', data_str_list[4])))
+           save_name = (data_str_list[2])
+           object_size = (int)(data_str_list[3])
+           object_interval = (int)(data_str_list[4])
+           object_number = (int)((re.sub(r'[^0-9]', '', data_str_list[5])))
            info(logger, 'Object size: ', object_size, ' Object interval: ', object_interval, ' Object number: ', object_number)
-           t = threading.Thread(target=process_downlink, args=(c, addr, object_size, object_interval, object_number))    
+           t = threading.Thread(target=process_downlink, args=(c, addr, save_name, object_size, object_interval, object_number))    
            t.start()
         
