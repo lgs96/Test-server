@@ -183,6 +183,7 @@ def process_downlink(c, addr, save_name, object_size, object_interval, object_nu
     while True: 
         data = c.recv(4096)
         if 'd_fin' in str(data):
+            info(logger, "Received msg from user ", data)
             info(logger, "Received finished message from mobile device")
             break
     

@@ -10,9 +10,13 @@ def cmd_run(cmd):
 def run_emulation(interface, bandwidth, delay, packetLoss, first=False):
     exeStr1 = ""
     if not first:
-        exeStr1 = exeStr1 + 'tc class change dev ' + interface + ' parent 1: classid 1:12 htb rate ' + str(bandwidth) + 'kbps\n'
+        exeStr1 = exeStr1 + "tc qdisc add dev "+interface+" root netem delay " +str(delay) + "ms loss"+str(packetLoss)+"% " 
     else:
-        exeStr1 = exeStr1 + "tc qdisc del dev "+interface+" root \n"        
+        delete_cmd(interface)
+        #exeStr1 = exeStr1 + "modprobe "+interface+"\n"
+        #exeStr1 = exeStr1 + "ip link set dev "+interface+" up \n" 
+        #exeStr1 = exeStr1 + "tc qdisc add dev enp4s0 ingress \n"    
+        exeStr1 = exeStr1 + "tc filter add dev enp4s0 parent ffff: protocol ip u32 match u32 0 0 flowid 1:1 action mirred egress redirect dev ifb0 \n"
         if int(bandwidth)>0:
             exeStr1 = exeStr1 + "tc qdisc add dev "+interface+" root handle 1: htb default 12 \n"
             exeStr1 = exeStr1 + "tc class add dev "+interface+" parent 1: classid 1:12 htb rate " + str(bandwidth) + "kbps \n"
@@ -24,11 +28,11 @@ def run_emulation(interface, bandwidth, delay, packetLoss, first=False):
                 exeStr1 = exeStr1 + "\n"
         cmd_run( exeStr1)
         print(exeStr1)
-        exeStr2 = ""
-        exeStr2 =  exeStr2 + "tc filter add dev " + interface + " protocol ip parent 1:0 prio 1 u32 match ip dst " + "223.38.35.163" + "/32 flowid 1:12 \n"
+        #exeStr2 = ""
+        #exeStr2 =  exeStr2 + "tc filter add dev " + interface + " protocol ip parent 1:0 prio 1 u32 match ip dst " + "223.38.35.163" + "/32 flowid 1:12 \n"
         #exeStr2 = exeStr2 + "tc filter add dev " + interface + " protocol ip parent 1:0 prio 1 u32 match ip src 223.38.35.16\32 flowid 1:12 \n"
-        cmd_run( exeStr2)
-        print(exeStr2)
+        #cmd_run( exeStr2)
+        #print(exeStr2)
 
 
 def repeat(interface, repeat_cnt=10):
@@ -56,7 +60,7 @@ def delete_cmd (interface):
 if __name__ == "__main__":
     #repeat('eno2', repeat_cnt=50)
     if len(sys.argv)==1:
-        run_emulation(interface = 'enp4s0', bandwidth = 100000, delay = 0, packetLoss = 5, first = True)
+        run_emulation(interface = 'ifb0', bandwidth = 100000, delay = 20, packetLoss = 0, first = True)
     else:
         run_emulation(interface = sys.argv[1], bandwidth = sys.argv[2], delay = sys.argv[3], packetLoss = 0, first = True)
 # exeStr1 = ""

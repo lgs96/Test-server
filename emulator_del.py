@@ -15,3 +15,4 @@ def delete_cmd (interface):
     
 if __name__ == "__main__":
     delete_cmd('enp4s0')
+    delete_cmd('ifb0')
