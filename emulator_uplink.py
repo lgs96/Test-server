@@ -60,7 +60,7 @@ def delete_cmd (interface):
 if __name__ == "__main__":
     #repeat('eno2', repeat_cnt=50)
     if len(sys.argv)==1:
-        run_emulation(interface = 'ifb0', bandwidth = 100000, delay = 20, packetLoss = 0, first = True)
+        run_emulation(interface = 'ifb0', bandwidth = 100000, delay = 50, packetLoss = 0.1, first = True)
     else:
         run_emulation(interface = sys.argv[1], bandwidth = sys.argv[2], delay = sys.argv[3], packetLoss = 0, first = True)
 # exeStr1 = ""
