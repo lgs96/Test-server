@@ -38,12 +38,12 @@ rlogger = CreateLogger('REPLACE', terminator = '\r')
 
 def start_tcpdump(sname, iname, hname, port):
     cmd = 'tcpdump -ttt -w data/trace_%s.pcap -i %s dst %s and dst port %d &' % (sname, iname, hname, port)
-    # cmd = str(cmd)
-    # print(cmd)
-    # cmd = 'tcpdump -ttt -w data/trace_%s.pcap &' % ('hello')
-    sudoPassword = 'glaakstp'
-    #print('echo %s|sudo -S %s' % (sudoPassword, cmd))
-    #p = os.system('sudo -S %s' % (cmd))
+    cmd = str(cmd)
+    print(cmd)
+    cmd = 'tcpdump -ttt -w data/trace_%s.pcap &' % ('hello')
+    sudoPassword = 'lgs0906!'
+    print('echo %s|sudo -S %s' % (sudoPassword, cmd))
+    p = os.system('sudo -S %s' % (cmd))
 
 def stop_tcpdump():
     os.system("kill -9 `ps -aux | grep tcpdump | awk '{print $2}'`")
