@@ -8,6 +8,8 @@ import re
 import numpy as np
 import logging
 import pickle
+import subprocess
+import datetime
 
 from numpy.core.fromnumeric import std
 
@@ -48,8 +50,12 @@ def start_tcpdump(sname, iname, hname, port):
 def stop_tcpdump():
     os.system("kill -9 `ps -aux | grep tcpdump | awk '{print $2}'`")
     
-def process_uplink(c, addr, save_name, tx_start, object_size, object_interval, object_number):
-    
+
+def process_uplink(c, addr, save_name, tx_start, object_size, object_interval, object_number, port, enable_tcpdump):
+
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    save_name = f"{save_name}_{current_time}"
+
     recv_size = 0
     start = time.time()
     device_first = -1
@@ -110,7 +116,10 @@ def process_uplink(c, addr, save_name, tx_start, object_size, object_interval, o
     info(logger,'Disconnected', addr, '\n')
     
     c.close()
-    #stop_tcpdump()
+
+    if enable_tcpdump:
+        stop_tcpdump()
+    
     object_size_arr = np.ones(len(object_latency_list[:]))*((int)(object_size))*8*1024
     throughput_arr = object_size_arr/(np.array(object_latency_list[:])*1e3)
     
@@ -150,10 +159,21 @@ def process_uplink(c, addr, save_name, tx_start, object_size, object_interval, o
     info(logger, 'First throughput: ', throughput_arr[0], 'Mbps First init latency: ', init_latency_arr[0], 'ms')
     info(logger, 'Mean/std throughput:', mean_throughput,' ',  std_throughput, 'Mbps Mean/std initial latency: ', mean_init_latency, ' ',std_init_latency)
 
-def process_downlink(c, addr, save_name, object_size, object_interval, object_number):
+
+def run_bpftrace(save_dir, port):
+    command = ['sudo', './run_bpftrace.sh', save_dir, str(port)]  # Convert port to string
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    return proc
+
+def process_downlink(c, addr, save_name, object_size, object_interval, object_number, port, enable_tcpdump):
     send_size = 0    
     start = time.time()
         
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    save_name = f"{save_name}_{current_time}"
+
+    bpf_process = run_bpftrace(save_name, port)
+
     for i in range(object_number):
         first_bytes_msg = "o_first_"+str(time.time())
         c.send(bytes(first_bytes_msg, encoding = "ascii"))
@@ -179,6 +199,15 @@ def process_downlink(c, addr, save_name, object_size, object_interval, object_nu
     end = time.time()
     
     ## save the log (get downlink log from the mobile device)
+
+    # Cleanup and finish processing
+    # When done, terminate the bpftrace process
+    bpf_process.terminate()  # Sends SIGTERM
+    bpf_process.wait()  # Waits for process to terminate
+
+    # Optionally, check if the process has indeed finished
+    if bpf_process.poll() is None:  # Process has not terminated yet
+        bpf_process.kill()  # Force kill if not responsive
     
     while True: 
         data = c.recv(4096)
@@ -221,18 +250,22 @@ def process_downlink(c, addr, save_name, object_size, object_interval, object_nu
     info(logger,'Download time mean: ', mean_tx_time ,'ms, std: ', std_tx_time,
                 ' Mean initial latency: ', mean_init_time, 'ms')
     info(logger,'Disconnected', addr)
-    #stop_tcpdump()       
+    
+    if enable_tcpdump:
+        stop_tcpdump()       
 
     
 if __name__ == '__main__':
 
-    if len(sys.argv) != 3:
-        logger.error('Input parameter is not valid')
-        logger.error('example) python3 server.py <interface:wlan0>')
+    enable_tcpdump = 0
+    if len(sys.argv) != 4:
+        logger.error('Input parameter is not valid %d' %(len(sys.argv)))
+        logger.error('example) python3 server.py <interface:wlan0> <port> <enable tcpdump>')
         exit()
     else:
         iname = sys.argv[1]
         pname = sys.argv[2]
+        enable_tcpdump = sys.argv[3]
         
     s = socket.socket()
     port = (int)(pname)
@@ -248,7 +281,9 @@ if __name__ == '__main__':
         
         sname = data[7:50].decode("ascii")
         logger.info('name %s iname %s addr0 %s addr1 %s', sname, iname,  addr[0], addr[1])
-        #start_tcpdump(sname, iname, addr[0], addr[1])
+        
+        if enable_tcpdump:
+            start_tcpdump(sname, iname, addr[0], addr[1])
         
         
         if 'u_start' in str(data):
@@ -261,7 +296,7 @@ if __name__ == '__main__':
            object_interval = (data_str_list[5])
            object_number =((re.sub(r'[^0-9]', '', data_str_list[6])))
            info(logger, 'Object size: ', object_size, ' Object interval: ', object_interval, ' Object number: ', object_number)
-           t = threading.Thread(target=process_uplink, args=(c, addr, save_name, tx_start, object_size, object_interval, object_number))
+           t = threading.Thread(target=process_uplink, args=(c, addr, save_name, tx_start, object_size, object_interval, object_number, port, enable_tcpdump))
            t.start()
         elif 'd_start' in str(data):
            logger.info('Downlink')
@@ -272,6 +307,6 @@ if __name__ == '__main__':
            object_interval = (int)(data_str_list[4])
            object_number = (int)((re.sub(r'[^0-9]', '', data_str_list[5])))
            info(logger, 'Object size: ', object_size, ' Object interval: ', object_interval, ' Object number: ', object_number)
-           t = threading.Thread(target=process_downlink, args=(c, addr, save_name, object_size, object_interval, object_number))    
+           t = threading.Thread(target=process_downlink, args=(c, addr, save_name, object_size, object_interval, object_number, port, enable_tcpdump))    
            t.start()
         
