@@ -18,15 +18,28 @@ if [ ! -d "$SAVE_DIR" ]; then
     exit 1
 fi
 
-# Embed the port number directly into the script
+# Function to clean up processes
+cleanup() {
+    echo "Terminating bpftrace processes..."
+    kill $CWND_PID $RETX_PID
+    wait $CWND_PID $RETX_PID 2>/dev/null
+    echo "Processes terminated."
+}
+
+# Trap SIGINT and SIGTERM to clean up properly
+trap cleanup SIGINT SIGTERM
+
+
+# Global variable initialization and use in probes
 sudo bpftrace -e "
+
 tracepoint:tcp:tcp_probe {
     \$sport = args->sport;
     \$dport = args->dport;
     \$hsport = ((\$sport & 0xff00) >> 8) | ((\$sport & 0x00ff) << 8);
     \$hdport = ((\$dport & 0xff00) >> 8) | ((\$dport & 0x00ff) << 8);
     if (\$sport == $PORT_NUMBER || \$dport == $PORT_NUMBER) {
-        printf(\"%d,%u,%u\n\", nsecs, args->snd_cwnd*1460, args->srtt);
+        printf(\"%llu,%u,%u\\n\", nsecs, args->snd_cwnd * 1460, args->srtt);
     }
 }" > "$SAVE_DIR/cwnd.csv" &
 CWND_PID=$!
@@ -38,7 +51,7 @@ tracepoint:tcp:tcp_retransmit_skb {
     \$hsport = ((\$sport & 0xff00) >> 8) | ((\$sport & 0x00ff) << 8);
     \$hdport = ((\$dport & 0xff00) >> 8) | ((\$dport & 0x00ff) << 8);
     if (\$sport == $PORT_NUMBER || \$dport == $PORT_NUMBER) {
-        printf(\"%d\n\", nsecs);
+        printf(\"%llu\\n\", nsecs);
     }
 }" > "$SAVE_DIR/retx.csv" &
 RETX_PID=$!

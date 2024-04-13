@@ -10,6 +10,7 @@ import logging
 import pickle
 import subprocess
 import datetime
+import csv
 
 from numpy.core.fromnumeric import std
 
@@ -194,7 +195,6 @@ def process_downlink(c, addr, save_name, object_size, object_interval, object_nu
             if 'o_recv' in str(data):
                 info(rlogger, "Object " ,i ," is received from client")
                 break
-        
         time.sleep(object_interval/1000)
     end = time.time()
     
@@ -202,8 +202,6 @@ def process_downlink(c, addr, save_name, object_size, object_interval, object_nu
 
     # Cleanup and finish processing
     # When done, terminate the bpftrace process
-    bpf_process.terminate()  # Sends SIGTERM
-    bpf_process.wait()  # Waits for process to terminate
 
     # Optionally, check if the process has indeed finished
     if bpf_process.poll() is None:  # Process has not terminated yet
@@ -215,6 +213,10 @@ def process_downlink(c, addr, save_name, object_size, object_interval, object_nu
             info(logger, "Received msg from user ", data)
             info(logger, "Received finished message from mobile device")
             break
+
+
+    bpf_process.terminate()  # Sends SIGTERM
+    bpf_process.wait()  # Waits for process to terminate
     
     c.close()
     
@@ -246,10 +248,36 @@ def process_downlink(c, addr, save_name, object_size, object_interval, object_nu
     with open('downlink_data/downlink'+save_name+'.pickle', 'wb') as fw:
         pickle.dump(loaded_downlink, fw)
 
+
     info(logger,'Total send size: ', send_size, 'bytes',  ' first download time: ', first_tx_time, 'ms  mean throughput: ', mean_throughput, 'Mbps')
     info(logger,'Download time mean: ', mean_tx_time ,'ms, std: ', std_tx_time,
                 ' Mean initial latency: ', mean_init_time, 'ms')
     info(logger,'Disconnected', addr)
+
+    data = {
+        'Total send size (bytes)': send_size,
+        'First download time (ms)': first_tx_time,
+        'Mean throughput (Mbps)': mean_throughput,
+        'Download time mean (ms)': mean_tx_time,
+        'Download time std (ms)': std_tx_time,
+        'Mean initial latency (ms)': mean_init_time
+    }
+    filename = 'result/' + save_name + '/summary.csv'
+
+    # Field names or column titles based on the dictionary keys
+    fieldnames = list(data.keys())
+
+    # Check if the file already exists to append or write header
+    try:
+        with open(filename, 'x', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerow(data)
+    except FileExistsError:
+        with open(filename, 'a', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writerow(data)
+
     
     if enable_tcpdump:
         stop_tcpdump()       
@@ -257,15 +285,15 @@ def process_downlink(c, addr, save_name, object_size, object_interval, object_nu
     
 if __name__ == '__main__':
 
-    enable_tcpdump = 0
-    if len(sys.argv) != 4:
+    enable_tcpdump = False
+    if len(sys.argv) != 3:
         logger.error('Input parameter is not valid %d' %(len(sys.argv)))
-        logger.error('example) python3 server.py <interface:wlan0> <port> <enable tcpdump>')
+        logger.error('example) python3 server.py <interface:wlan0> <port>')
         exit()
     else:
         iname = sys.argv[1]
         pname = sys.argv[2]
-        enable_tcpdump = sys.argv[3]
+        #enable_tcpdump = sys.argv[3]
         
     s = socket.socket()
     port = (int)(pname)
@@ -309,4 +337,3 @@ if __name__ == '__main__':
            info(logger, 'Object size: ', object_size, ' Object interval: ', object_interval, ' Object number: ', object_number)
            t = threading.Thread(target=process_downlink, args=(c, addr, save_name, object_size, object_interval, object_number, port, enable_tcpdump))    
            t.start()
-        
