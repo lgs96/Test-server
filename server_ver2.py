@@ -283,7 +283,34 @@ def process_downlink(c, addr, save_name, object_size, object_interval, object_nu
         stop_tcpdump()       
 
     
+
+
+def check_root():
+    """Check if the script is already running as root."""
+    return subprocess.run(['id', '-u'], capture_output=True, text=True).stdout.strip() == '0'
+
+def run_command_with_sudo(command):
+    """
+    Run a command with sudo, prompting the user for their password if necessary.
+    """
+    try:
+        result = subprocess.run(['sudo'] + command, capture_output=False, text=True)
+        if result.returncode != 0:
+            print("Failed to execute command with sudo.")
+            sys.exit(1)
+    except Exception as e:
+        print(f"Error during command execution: {e}")
+        sys.exit(1)
+
+
 if __name__ == '__main__':
+
+    if not check_root():
+        print("This script needs root permissions to run certain operations.")
+        run_command_with_sudo(['python3'] + sys.argv)
+    else:
+        print("Running with root privileges.")
+        # Put the rest of your script here that requires root privileges
 
     enable_tcpdump = False
     if len(sys.argv) != 3:
@@ -312,6 +339,17 @@ if __name__ == '__main__':
         
         if enable_tcpdump:
             start_tcpdump(sname, iname, addr[0], addr[1])
+
+        # Setting TCP congestion control algorithm based on sname
+        if 'bbr' in sname:
+            os.system(f'sudo sysctl -w net.ipv4.tcp_congestion_control=bbr')
+            logger.info('TCP Congestion Control set to BBR')
+        elif 'reno' in sname:
+            os.system(f'sudo sysctl -w net.ipv4.tcp_congestion_control=reno')
+            logger.info('TCP Congestion Control set to Reno')
+        elif 'cubic' in sname:
+            os.system(f'sudo sysctl -w net.ipv4.tcp_congestion_control=cubic')
+            logger.info('TCP Congestion Control set to Cubic')
         
         
         if 'u_start' in str(data):

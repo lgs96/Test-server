@@ -14,5 +14,5 @@ def delete_cmd (interface):
     cmd_run(exeStr)
     
 if __name__ == "__main__":
-    delete_cmd('enp4s0')
+    delete_cmd('enp7s0')
     delete_cmd('ifb0')

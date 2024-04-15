@@ -56,7 +56,7 @@ def delete_cmd (interface):
 if __name__ == "__main__":
     #repeat('eno2', repeat_cnt=50)
     if len(sys.argv)==1:
-        run_emulation(interface = 'enp4s0', bandwidth = 100000, delay = 0, packetLoss = 5, first = True)
+        run_emulation(interface = 'enp58s0', bandwidth = 80000, delay = 20, packetLoss = 0, first = True)
     else:
         run_emulation(interface = sys.argv[1], bandwidth = sys.argv[2], delay = sys.argv[3], packetLoss = 0, first = True)
 # exeStr1 = ""
