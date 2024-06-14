@@ -4,3 +4,4 @@ downlink_data/*
 paper_figures/*
 uplink_data/*
 result/*
+*.pcap
