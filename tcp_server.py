@@ -350,6 +350,9 @@ if __name__ == '__main__':
         elif 'cubic' in sname:
             os.system(f'sudo sysctl -w net.ipv4.tcp_congestion_control=cubic')
             logger.info('TCP Congestion Control set to Cubic')
+        elif 'ccp' in sname:
+            os.system(f'sudo sysctl -w net.ipv4.tcp_congestion_control=ccp')
+            logger.info('TCP Congestion Control set to CCP (Copa)')
         
         
         if 'u_start' in str(data):
